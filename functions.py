@@ -55,24 +55,6 @@ def json_to_pickle(pickle_filename='data_raw.pkl'):
     return df
 
 
-def get_chat_names(pickle_file):
-    """
-    Returns dataframe of all chatnames and datestamps they were changed at
-    WARNING: will also return a normal message containing the words 'named the group '
-    :param pickle_file: path to pickle file of message dataframe with column 'message' containing message text
-    :return: dataframe with columns ['timestamp','chatname']
-    """
-    # load file
-    df = pd.read_pickle(pickle_file)
-    # get all messages with a group name change
-    df = df[df['message'].str.contains('named the group')]
-    # return the text after the string 'named the group '
-    df['chatname'] = df['message'].apply(lambda x: x[x.find('named the group ') + 16:])
-    df.drop('message', axis=1, inplace=True)
-
-    return df
-
-
 def edit_data(pickle_file, print_filename=False, perform_printouts=False):
     """
     Makes the dataframe-y by turning names into categorical and timestamp column a datetime index & fixing emoji
@@ -89,8 +71,7 @@ def edit_data(pickle_file, print_filename=False, perform_printouts=False):
     df.sort_index(inplace=True)
 
     # fix errington's alt account name
-    erring_alt_name = "\u00e0\u00b8\u0084\u00e0\u00b8\u0084\u00e0\u00b8\u0084\u00e0\u00b8\u00b2\u00e0\u00b9\u0088" \
-                      "\u00e0\u00b8\u00b0\u00e0\u00b8\u00b0\u00e0\u00b8\u00b0\u00e0\u00b8\u00a3\u00e0\u00b9\u0087 "
+    erring_alt_name = "??? ???????"
     df['sender'].replace({erring_alt_name: 'Alex Errington'}, inplace=True)
 
     # sender as categorical
@@ -105,9 +86,29 @@ def edit_data(pickle_file, print_filename=False, perform_printouts=False):
         print(df.head())
         print(df.info())
         print(df.describe())
-        print(f'most common message: {df.describe().iloc[2, 1]}')
+        print(f'most common message: {df.describe().iloc[1, 2]}')
         print(f'Member names: {df.sender.cat.categories}')
 
+    return df
+
+
+def get_chat_names(pickle_file, to_file=False):
+    """
+    Returns dataframe of all chatnames and datestamps they were changed at
+    WARNING: will also return a normal message containing the words 'named the group '
+    :param pickle_file: path to pickle file of message dataframe with column 'message' containing message text
+    :return: dataframe with columns ['timestamp','chatname']
+    """
+    # load file
+    df = pd.read_pickle(pickle_file)
+    # get all messages with a group name change
+    df = df[df['message'].str.contains('named the group')]
+    # return the text after the string 'named the group '
+    df['chatname'] = df['message'].apply(lambda x: x[x.find('named the group ') + 16:])
+    df.drop('message', axis=1, inplace=True)
+
+    if to_file:
+        df.to_pickle('chatnames.pkl')
     return df
 
 
