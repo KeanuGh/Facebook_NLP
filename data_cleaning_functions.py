@@ -51,42 +51,44 @@ def json_to_pickle(pickle_filename='data_raw.pkl'):
     # to pickle
     df.to_pickle(pickle_filename)
     print(f'data pickled to {pickle_filename}')
+    print(df.head())
 
     return df
 
 
-def edit_data(pickle_file, print_filename=False, perform_printouts=False):
+def edit_data(input_file, output_file=None, perform_printouts=False):
     """
     Makes the dataframe-y by turning names into categorical and timestamp column a datetime index & fixing emoji
     :param perform_printouts: if True print outs some information about the dataframe
-    :param pickle_file: path to pickle file containing dataframe
-    :param print_filename: if input prints out pickle file with this name
+    :param input_file: path to pickle file containing dataframe
+    :param output_file: if input prints out pickle file with this name
     :return: dataframe with nice clean data. columns: ['timestamp', 'sender', 'message'] index: timestamp
     """
-    df = pd.read_pickle(pickle_file)
+    df = pd.read_pickle(input_file)
 
     # to datetime
-    df['timsstamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
     df.set_index('timestamp', inplace=True)
     df.sort_index(inplace=True)
 
     # fix errington's alt account name
-    erring_alt_name = "??? ???????"
+    erring_alt_name = "คคค า่ะะะร็"
     df['sender'].replace({erring_alt_name: 'Alex Errington'}, inplace=True)
 
     # sender as categorical
     df['sender'] = df['sender'].astype('category')
 
     # printouts
-    if print_filename:
-        df.to_pickle(print_filename)
+    if output_file is not None:
+        df.to_pickle(output_file)
     else:
         pass
     if perform_printouts:
         print(df.head())
         print(df.info())
         print(df.describe())
-        print(f'most common message: {df.describe().iloc[1, 2]}')
+        top_message = df.describe()['message']['top']
+        print(f'most common message: {top_message}')
         print(f'Member names: {df.sender.cat.categories}')
 
     return df
@@ -96,25 +98,32 @@ def get_chat_names(pickle_file, to_file=False):
     """
     Returns dataframe of all chatnames and datestamps they were changed at
     WARNING: will also return a normal message containing the words 'named the group '
+    :param to_file: if True will create pickle file of chatnames & their timestamps
     :param pickle_file: path to pickle file of message dataframe with column 'message' containing message text
     :return: dataframe with columns ['timestamp','chatname']
     """
     # load file
     df = pd.read_pickle(pickle_file)
+
     # get all messages with a group name change
     df = df[df['message'].str.contains('named the group')]
+
     # return the text after the string 'named the group '
     df['chatname'] = df['message'].apply(lambda x: x[x.find('named the group ') + 16:])
     df.drop('message', axis=1, inplace=True)
+
+    # drop chatnames containing a newline character because that's just crazy
+    df = df[~df.chatname.str.contains('\n')]
 
     if to_file:
         df.to_pickle('chatnames.pkl')
     return df
 
 
+# for testing
 if __name__ == '__main__':
     json_to_pickle()
-    data = edit_data('data_raw.pkl', print_filename='data.pkl', perform_printouts=True)
-    chatnames = get_chat_names('data.pkl')
+    data = edit_data('data_raw.pkl', output_file='data.pkl', perform_printouts=True)
+    chatnames = get_chat_names('data.pkl', to_file=True)
     for chatname in chatnames['chatname']:
         print(chatname)
