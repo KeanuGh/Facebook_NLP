@@ -28,12 +28,12 @@ def json_to_pickle(pickle_filename='data_raw.pkl'):
             pass
         return obj
 
-    # files into a dataframe
+    # messages into a dataframe
     messages = []
     senders = []
     timestamps = []
     for filepath in file_list:
-        print("reading", filepath, "...")
+        print(f"reading file {filepath}...")
         with open(filepath) as file:
             for message in json.load(file, object_hook=parse_obj)['messages']:
                 # check if messasge contains text first
@@ -56,10 +56,10 @@ def json_to_pickle(pickle_filename='data_raw.pkl'):
     return df
 
 
-def edit_data(input_file, output_file=None, perform_printouts=False):
+def clean_data(input_file, output_file=None, printouts=False):
     """
-    Makes the dataframe-y by turning names into categorical and timestamp column a datetime index & fixing emoji
-    :param perform_printouts: if True print outs some information about the dataframe
+    Makes the data dataframe-y by turning names into categorical and timestamp column a datetime index & fixing emoji
+    :param printouts: if True print outs some information about the dataframe
     :param input_file: path to pickle file containing dataframe
     :param output_file: if input prints out pickle file with this name
     :return: dataframe with nice clean data. columns: ['timestamp', 'sender', 'message'] index: timestamp
@@ -83,7 +83,7 @@ def edit_data(input_file, output_file=None, perform_printouts=False):
         df.to_pickle(output_file)
     else:
         pass
-    if perform_printouts:
+    if printouts:
         print(df.head())
         print(df.info())
         print(df.describe())
@@ -115,15 +115,19 @@ def get_chat_names(pickle_file, to_file=False):
     # drop chatnames containing a newline character because that's just crazy
     df = df[~df.chatname.str.contains('\n')]
 
+    # to file(s)
     if to_file:
         df.to_pickle('chatnames.pkl')
+        with open('chatnames.txt', 'w', encoding="utf-8") as file:
+            for i, row in df.iterrows():
+                file.write(i.strftime("%Y-%m-%d %H:%M ") + row.sender + ': ' + row.chatname + '\n')
     return df
 
 
 # for testing
 if __name__ == '__main__':
     json_to_pickle()
-    data = edit_data('data_raw.pkl', output_file='data.pkl', perform_printouts=True)
+    data = clean_data('data_raw.pkl', output_file='data.pkl', printouts=True)
     chatnames = get_chat_names('data.pkl', to_file=True)
     for chatname in chatnames['chatname']:
         print(chatname)
