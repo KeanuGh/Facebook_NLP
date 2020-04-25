@@ -94,16 +94,20 @@ def clean_data(input_file, output_file=None, printouts=False):
     return df
 
 
-def get_chat_names(pickle_file, to_file=False):
+def get_chat_names(data_file, to_file=False, to_numpy=False):
     """
     Returns dataframe of all chatnames and datestamps they were changed at
     WARNING: will also return a normal message containing the words 'named the group '
+    :param to_numpy: whether to return as a numpy array
     :param to_file: if True will create pickle file of chatnames & their timestamps
-    :param pickle_file: path to pickle file of message dataframe with column 'message' containing message text
+    :param data_file: path to pickle file of message dataframe with column 'message' containing message text
     :return: dataframe with columns ['timestamp','chatname']
     """
     # load file
-    df = pd.read_pickle(pickle_file)
+    if type(data_file) is str:
+        df = pd.read_pickle(data_file)
+    else:
+        df = data_file
 
     # get all messages with a group name change
     df = df[df['message'].str.contains('named the group')]
@@ -121,7 +125,11 @@ def get_chat_names(pickle_file, to_file=False):
         with open('chatnames.txt', 'w', encoding="utf-8") as file:
             for i, row in df.iterrows():
                 file.write(i.strftime("%Y-%m-%d %H:%M ") + row.sender + ': ' + row.chatname + '\n')
-    return df
+
+    if to_numpy:
+        return df.chatname.to_numpy()
+    else:
+        return df
 
 
 # for testing

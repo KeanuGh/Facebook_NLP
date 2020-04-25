@@ -9,7 +9,7 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.optimizers import Adam
 
 
-def start_and_end_tokens(texts, start_token='\t', end_token='\n'):
+def start_and_end_tokens(texts: np.array, start_token: str = '\t', end_token: str = '\n') -> tuple:
     """
     Adds token (default '\t') to the start of text
     adds token (default '\n') to the end of text
@@ -23,7 +23,7 @@ def start_and_end_tokens(texts, start_token='\t', end_token='\n'):
     return texts_inputs, texts_targets
 
 
-def build_vocabulary(texts, start_token='\t', end_token='\n'):
+def build_vocabulary(texts, start_token='\t', end_token='\n') -> set:
     """
     builds a set containing every unique character in the texts
     :param end_token: end token
@@ -51,7 +51,7 @@ def char_to_int_maps(vocab):
 
 
 def gen_input_and_target(text_inputs, text_targets, char_to_idx: dict, vocab: set, seq_length: int = 20, step: int = 1,
-                         pickle_filename: str = None):
+                         pickle_filename: str = None) -> tuple:
     """
     TODO
     :param text_targets:
@@ -67,23 +67,20 @@ def gen_input_and_target(text_inputs, text_targets, char_to_idx: dict, vocab: se
     max_len = text_inputs.map(len).max()
 
     # create column in dataframe containing vector rep. of characters
-    inputs_as_int = [[char_to_idx[c] for c in seq] for seq in text_inputs]
-    targets_as_int = [[char_to_idx[c] for c in seq] for seq in text_targets]
+    # inputs_as_int = [[char_to_idx[c] for c in seq] for seq in text_inputs]
+    #  targets_as_int = [[char_to_idx[c] for c in seq] for seq in text_targets]
     # pad sequences to max length (after text)
-    inputs_as_int = pad_sequences(inputs_as_int, max_len, padding='pre')
-    targets_as_int = pad_sequences(targets_as_int, max_len, padding='pre')
+    # inputs_as_int = pad_sequences(inputs_as_int, max_len, padding='pre')
+    # targets_as_int = pad_sequences(targets_as_int, max_len, padding='pre')
 
     # instantiate lists to contain sequences and next characters
     texts = []
     next_chars = []
     # loop over each text in texts to get subset of length seq_length and the next character
-    for input_text, target_text in [*zip(inputs_as_int, targets_as_int)]:
-        print(input_text)
-        print(target_text)
-        for i in range(0, len(inputs_as_int) - seq_length, step):
+    for input_text, target_text in [*zip(text_inputs, text_inputs)]:
+        for i in range(0, len(input_text) - seq_length - 1, step):
             texts.append(input_text[i:i + seq_length])
             next_chars.append(target_text[i + seq_length])
-        print(f"\ntext: {texts[-1]}\ntarget: {next_chars[-1]}")
 
     # create dataframe with these lists ad columns
     ml_data = pd.DataFrame({'inputs': texts, 'targets': next_chars})
@@ -107,7 +104,7 @@ def gen_input_and_target(text_inputs, text_targets, char_to_idx: dict, vocab: se
     return numerical_texts, numerical_next_chars
 
 
-def generate_model(vocab: set, seq_len: int, rnn_units=50, learning_rate=0.0003):
+def generate_model(vocab: set, seq_len: int, rnn_units=50, learning_rate=0.0003) -> tf.keras.Model:
     """
     TODO write doc for model generation
     :param learning_rate:
@@ -116,12 +113,13 @@ def generate_model(vocab: set, seq_len: int, rnn_units=50, learning_rate=0.0003)
     :param rnn_units:
     :return:
     """
-    optimizer = Adam(lr=learning_rate)
     model = Sequential()
+    optimizer = Adam(lr=learning_rate)
+
     # model.add(Embedding(input_dim=len(vocab), output_dim=20, input_length=seq_len + 1))
-    model.add(LSTM(rnn_units, input_shape=(seq_len + 1, len(vocab)),
-                   return_sequences=True, dropout=0.15, recurrent_dropout=0.15,
-                   recurrent_initializer='glorot_uniform'))
+    model.add(GRU(rnn_units, input_shape=(seq_len + 1, len(vocab)),
+                  return_sequences=True, dropout=0.15, recurrent_dropout=0.15,
+                  recurrent_initializer='glorot_uniform'))
     model.add(GRU(rnn_units, return_sequences=False, dropout=0.15, recurrent_dropout=0.15,
                   recurrent_initializer='glorot_uniform'))
     model.add(Dense(len(vocab), activation='softmax'))
@@ -130,27 +128,28 @@ def generate_model(vocab: set, seq_len: int, rnn_units=50, learning_rate=0.0003)
     return model
 
 
-def fit_model(model, inputs, targets, n_epochs: int = 10, batch_size: int = 64):
+def fit_model(model, inputs, targets, n_epochs: int = 10, batch_size: int = 64) -> tf.keras.Model:
     # create checkpoints for callbacks
     checkpoint_dir = './training_checkpoints'
     checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt_{epoch}")
-    checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
-        filepath=checkpoint_prefix,
-        save_weights_only=True)
+    checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_prefix,
+                                                             save_weights_only=True)
 
     # fit model
-    history = model.fit(inputs, targets,
-                        epochs=n_epochs,
-                        callbacks=[checkpoint_callback],
-                        batch_size=batch_size,
-                        verbose=2)
+    print(inputs)
+    print(targets)
+    model.fit(inputs, targets,
+              epochs=n_epochs,
+              callbacks=[checkpoint_callback],
+              batch_size=batch_size,
+              verbose=2)
     model.save('model.h5')
     model.reset_metrics()
     return model
 
 
 def generate_text(model, n: int, max_len: int, seq_len: int, vocab: set, char_to_idx: dict, idx_to_char: dict,
-                  start_token: str = '\t', end_token: str = '\n', creativity=1):
+                  start_token: str = '\t', end_token: str = '\n', creativity=1) -> None:
     """
     TODO: write doc for text generation
     :param seq_len:
@@ -165,9 +164,11 @@ def generate_text(model, n: int, max_len: int, seq_len: int, vocab: set, char_to
     :param creativity:
     :return:
     """
+
     # crativity: rescale prediction based on 'temperature'
-    def scale_softmax(softmax_pred, temperatrure=creativity):
-        scaled_pred = np.exp(np.log(softmax_pred) / temperatrure)
+    def scale_softmax(preds, temperatrure=creativity):
+        scaled_pred = np.asarray(preds).astype('float64')
+        scaled_pred = np.exp(np.log(scaled_pred) / temperatrure)
         scaled_pred = scaled_pred / np.sum(scaled_pred)
         scaled_pred = np.random.multinomial(1, scaled_pred, 1)
         return np.argmax(scaled_pred)
@@ -181,18 +182,20 @@ def generate_text(model, n: int, max_len: int, seq_len: int, vocab: set, char_to
         # to contain output text, initialise by filling with start character
         output_seq = np.zeros([1, seq_len + 1, len(vocab)])
         output_seq[0, 0, char_to_idx[start_token]] = 1.
-
         # generate new characters until you reach end token or text reaches maximum length
         while not stop and counter < max_len + 1:
             probs = model.predict_proba(output_seq, verbose=0)[0]
-            c = scale_softmax(probs, creativity)
+            # print(probs)
+            # c = idx_to_char[scale_softmax(probs, creativity)]
+            c = np.random.choice(sorted(list(vocab)), replace=True, p=probs.reshape(len(vocab)))
             if c == end_token:
                 stop = True
             else:
                 text += c
-                output_seq[0, counter, char_to_idx[c]] = 1.
+                # output_seq[0, counter, char_to_idx[c]] = 1.
                 counter += 1
         print(text)
+    return None
 
 
 if __name__ == '__main___':
