@@ -9,29 +9,22 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.optimizers import Adam
 
 
-def start_and_end_tokens(texts: np.array, start_token: str = '\t', end_token: str = '\n') -> tuple:
+def start_and_end_tokens(texts: np.array, end_token: str = '\n') -> tuple:
     """
-    Adds token (default '\t') to the start of text
     adds token (default '\n') to the end of text
-    :param texts: pandas Series containing texts
-    :param start_token: start token
-    :param end_token: end token
-    :return: pandas series containing texts with start and end tokens
     """
-    texts_inputs = texts.apply(lambda x: start_token + x)
-    texts_targets = texts.apply(lambda x: x + end_token)
-    return texts_inputs, texts_targets
+    texts_stopped = texts.apply(lambda x: x + end_token)
+    return texts_stopped
 
 
-def build_vocabulary(texts, start_token='\t', end_token='\n') -> set:
+def build_vocabulary(texts, end_token='\n') -> set:
     """
     builds a set containing every unique character in the texts
     :param end_token: end token
-    :param start_token: start token
     :param texts: pandas Series containing all texts
     :return: vocabualary set
     """
-    vocab = {start_token, end_token}  # add stop and start tokens
+    vocab = {end_token}  # add stop token
     for text in texts:
         for c in text:
             if c not in vocab:
@@ -50,11 +43,10 @@ def char_to_int_maps(vocab):
     return char_to_idx, idx_to_char
 
 
-def gen_input_and_target(text_inputs, text_targets, char_to_idx: dict, vocab: set, seq_length: int = 20, step: int = 1,
+def gen_input_and_target(text_inputs, char_to_idx: dict, vocab: set, seq_length: int = 20, step: int = 1,
                          pickle_filename: str = None) -> tuple:
     """
     TODO
-    :param text_targets:
     :param text_inputs:
     :param vocab:
     :param step:
@@ -63,37 +55,36 @@ def gen_input_and_target(text_inputs, text_targets, char_to_idx: dict, vocab: se
     :param pickle_filename:
     :return: dataframe w/ columns 'inputs', 'targets' containing text sequences and their next
     """
-    # get max length
-    max_len = text_inputs.map(len).max()
-
-    # create column in dataframe containing vector rep. of characters
-    # inputs_as_int = [[char_to_idx[c] for c in seq] for seq in text_inputs]
-    #  targets_as_int = [[char_to_idx[c] for c in seq] for seq in text_targets]
-    # pad sequences to max length (after text)
-    # inputs_as_int = pad_sequences(inputs_as_int, max_len, padding='pre')
-    # targets_as_int = pad_sequences(targets_as_int, max_len, padding='pre')
+    # merge all the text together
+    text_inputs = ''.join(text_inputs.to_numpy().flatten())
+    print(text_inputs)
 
     # instantiate lists to contain sequences and next characters
-    texts = []
+    sequences = []
     next_chars = []
     # loop over each text in texts to get subset of length seq_length and the next character
-    for input_text, target_text in [*zip(text_inputs, text_inputs)]:
-        for i in range(0, len(input_text) - seq_length - 1, step):
-            texts.append(input_text[i:i + seq_length])
-            next_chars.append(target_text[i + seq_length])
+    for i in range(0, len(text_inputs) - seq_length, step):
+        sequences.append(text_inputs[i:i + seq_length])
+        next_chars.append(text_inputs[i + seq_length])
 
     # create dataframe with these lists ad columns
-    ml_data = pd.DataFrame({'inputs': texts, 'targets': next_chars})
+    ml_data = pd.DataFrame({'inputs': sequences, 'targets': next_chars})
+
+    # create vector rep. of inputs and targets
+    seqs_as_int = [[char_to_idx[c] for c in seq] for seq in sequences]
+    next_char_as_int = [char_to_idx[c] for c in next_chars]
 
     # instanciate empty vectors to contain input and target data
-    numerical_texts = np.zeros((len(ml_data['inputs']), seq_length + 1, len(vocab)), dtype=bool)
-    numerical_next_chars = np.zeros((len(ml_data['targets']), len(vocab)), dtype=bool)
+    numerical_texts = np.zeros(((len(text_inputs) - seq_length), seq_length + 1, len(vocab)),
+                               dtype=bool)
+    numerical_next_chars = np.zeros(((len(text_inputs) - seq_length), len(vocab)), dtype=bool)
 
     # vectorise imput and targets
-    for i, text in enumerate(ml_data['inputs']):
+    for i, text in enumerate(seqs_as_int):
         for t, idx in enumerate(text):
             numerical_texts[i, t, idx] = 1
-            numerical_next_chars[i, idx] = 1
+    for i, idx in enumerate(next_char_as_int):
+        numerical_next_chars[i, idx] = 1
 
     # print file to pickle
     if pickle_filename:
@@ -148,8 +139,8 @@ def fit_model(model, inputs, targets, n_epochs: int = 10, batch_size: int = 64) 
     return model
 
 
-def generate_text(model, n: int, max_len: int, seq_len: int, vocab: set, char_to_idx: dict, idx_to_char: dict,
-                  start_token: str = '\t', end_token: str = '\n', creativity=1) -> None:
+def generate_text(model, n: int, max_len: int, seq_len: int, vocab: set, char_to_idx: dict, end_token: str = '\n',
+                  creativity=1) -> None:
     """
     TODO: write doc for text generation
     :param seq_len:
@@ -158,8 +149,6 @@ def generate_text(model, n: int, max_len: int, seq_len: int, vocab: set, char_to
     :param max_len:
     :param vocab:
     :param char_to_idx:
-    :param idx_to_char:
-    :param start_token:
     :param end_token:
     :param creativity:
     :return:
@@ -181,7 +170,7 @@ def generate_text(model, n: int, max_len: int, seq_len: int, vocab: set, char_to
 
         # to contain output text, initialise by filling with start character
         output_seq = np.zeros([1, seq_len + 1, len(vocab)])
-        output_seq[0, 0, char_to_idx[start_token]] = 1.
+        output_seq[0, 0, char_to_idx[end_token]] = 1.
         # generate new characters until you reach end token or text reaches maximum length
         while not stop and counter < max_len + 1:
             probs = model.predict_proba(output_seq, verbose=0)[0]
