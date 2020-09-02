@@ -1,3 +1,10 @@
+# filetypes
+*.pkl
+*.txt
+*.png
+*.h5
+
+# directories
 /data/
-/*.pkl
-/notes.txt
+/gpt-2-finetuning/
+/facebook-KeanuGhorbanian/

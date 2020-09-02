@@ -1,8 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <module type="PYTHON_MODULE" version="4">
   <component name="NewModuleRootManager">
-    <content url="file://$MODULE_DIR$" />
-    <orderEntry type="jdk" jdkName="Python 3.7 (tf-gpu)" jdkType="Python SDK" />
+    <content url="file://$MODULE_DIR$">
+      <excludeFolder url="file://$MODULE_DIR$/data" />
+      <excludeFolder url="file://$MODULE_DIR$/facebook-KeanuGhorbanian" />
+      <excludeFolder url="file://$MODULE_DIR$/facebook-KeanuGhorbanian/messages/inbox/animalcrossing_z0-a5pz9zq/files" />
+      <excludeFolder url="file://$MODULE_DIR$/facebook-KeanuGhorbanian/messages/inbox/ashleighlouisegeorgemooreandmatthewbarter_ylfdmhoyqw/photos" />
+      <excludeFolder url="file://$MODULE_DIR$/facebook-KeanuGhorbanian/messages/inbox/bivuneupanetomsmithandshelbyfinch_oimzgedxlq/photos" />
+      <excludeFolder url="file://$MODULE_DIR$/facebook-KeanuGhorbanian/messages/inbox/blackhearttattoostudio_duhq2w0m5g/photos" />
+      <excludeFolder url="file://$MODULE_DIR$/facebook-KeanuGhorbanian/messages/inbox/brizzle_cl6qhbwdva/photos" />
+      <excludeFolder url="file://$MODULE_DIR$/facebook-KeanuGhorbanian/messages/inbox/emilyjadethomas_jc3ec08qyg/photos" />
+      <excludeFolder url="file://$MODULE_DIR$/facebook-KeanuGhorbanian/messages/inbox/immortaltattoobournemouth_ysuqjzwala/photos" />
+      <excludeFolder url="file://$MODULE_DIR$/facebook-KeanuGhorbanian/messages/inbox/jamesphillips_rgux5xhn8q/photos" />
+      <excludeFolder url="file://$MODULE_DIR$/facebook-KeanuGhorbanian/messages/inbox/keanughorbanian_qbwhc_zymg/photos" />
+      <excludeFolder url="file://$MODULE_DIR$/facebook-KeanuGhorbanian/messages/inbox/samsollymarianneaspburyannaclementeand3others_empidzaiga/photos" />
+      <excludeFolder url="file://$MODULE_DIR$/facebook-KeanuGhorbanian/messages/inbox/saraghorbanian_vwwfro4x3w/photos" />
+      <excludeFolder url="file://$MODULE_DIR$/facebook-KeanuGhorbanian/messages/stickers_used" />
+      <excludeFolder url="file://$MODULE_DIR$/gpt-2-finetuning" />
+      <excludeFolder url="file://$MODULE_DIR$/venv" />
+    </content>
+    <orderEntry type="jdk" jdkName="Python 3.8 (Facebook_NLP)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PyDocumentationSettings">

@@ -1,8 +1,9 @@
 from data_cleaning_functions import *
-from nlp import *
+from my_nlp import *
 from tensorflow.keras.models import load_model
 import pandas as pd
 import pickle
+import re
 
 
 def main():
@@ -12,21 +13,30 @@ def main():
     # cleaned_data = clean_data(input_file='data_raw.pkl', output_file='data.pkl', printouts=False)
 
     # get chat names
-    chatnames_df = get_chat_names('data.pkl', to_file=True, to_numpy=False)
+    # df = get_chat_names('data.pkl', to_file=True, to_numpy=False)
+    # column = 'chatname'
 
-    # create column containing lengths of chatnames
-    chatnames_df['text_length'] = chatnames_df['chatname'].map(len)
-    # chatnames_df['text_length'].plot(kind='hist', bins=20)
-    # filter out group names with length > 120
-    # [chatnames_df = chatnames_df[chatnames_df['text_leng]th'] < 120]
+    # get messages from Keanu
+    df = pd.read_pickle('data.pkl')
+    column = 'message'
+    df = df[df['sender'] == 'Keanu Ghorbanian'].loc['2019']
+    # remove non-alphanumeric characters
+    df[column] = df[column].str.replace('[^a-zA-Z\s]', '')
+
+    # plot message lengths
+    df['text_length'] = df[column].map(len)
+    # df['text_length'].plot(kind='hist', bins=20)
 
     # add start and end tokens to input and output
     start_token = '\t'
     end_token = '\n'
-    chatnames_df['inputs'] = start_and_end_tokens(chatnames_df['chatname'], end_token=end_token)
+    sequence_length = 15  # length of training sequences
+    max_gen_len = 120  # maximum length of generated texts
+    df['inputs'] = end_tokens(df[column], end_token=end_token)
 
     # build vocabulary
-    vocab = build_vocabulary(chatnames_df['chatname'], end_token=end_token)
+    vocab = build_vocabulary(df[column], end_token=end_token)
+    print(f'number of text samples: {len(df)}')
     print(f'vocabulary list: {sorted(list(vocab))}')
     print(f'vocabulary size: {len(vocab)}')
 
@@ -35,18 +45,23 @@ def main():
 
     # build character-to-index dictionaries for vectorisation
     char_to_idx, idx_to_char = char_to_int_maps(vocab)
-    inputs, targets = gen_input_and_target(chatnames_df['inputs'],
+    inputs, targets = gen_input_and_target(df['inputs'],
                                            vocab=vocab,
                                            char_to_idx=char_to_idx,
-                                           seq_length=20,
+                                           seq_length=sequence_length,
+                                           vectorize=True,
+                                           print_test=True,
                                            pickle_filename='tf_dataset.pkl')
 
     # generate model
-    model = generate_model(vocab, rnn_units=128, seq_len=20)
-    model = fit_model(model, inputs, targets, n_epochs=5)
-    # model = load_model('model.h5')
-    generate_text(model, n=10, max_len=120, seq_len=20, vocab=vocab,
-                  char_to_idx=char_to_idx)
+    # model = generate_model(vocab, rnn_units=1024, seq_len=sequence_length, embedding=False)
+    # model = fit_model(model, inputs, targets, n_epochs=10)
+    model = load_model('model.h5')
+    test_string = [char_to_idx[c] for c in 'test string']
+    test_string = [idx_to_char[i] for i in test_string]
+    print(''.join(test_string))
+    generate_text(model, n=10, max_len=max_gen_len, seq_len=sequence_length, vocab=vocab,
+                  char_to_idx=char_to_idx, idx_to_char=idx_to_char, embedding=False)
 
 
 def quick_generate(n_gen=10, vocab_file='vocab.pkl'):

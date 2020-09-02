@@ -4,7 +4,7 @@ import json
 import pandas as pd
 
 
-def json_to_pickle(pickle_filename='data_raw.pkl'):
+def json_to_pickle(pickle_filename: str = 'data_raw.pkl'):
     """
     TODO: more user-friendly json file input
     Reads json files
@@ -32,21 +32,86 @@ def json_to_pickle(pickle_filename='data_raw.pkl'):
     messages = []
     senders = []
     timestamps = []
+    reactions = []
+    category = []
+
+    # content cases with multiple possible values in one message
+    dict_cases = {
+        'photos': 'PHOTO',
+        'videos': 'VIDEO',
+        'gifs': 'GIF',
+        'audio_files': 'AUDIO',
+        'files': 'FILE',
+    }
+
     for filepath in file_list:
-        print(f"reading file {filepath}...")
+        # print(f"reading file {filepath}...")
         with open(filepath) as file:
             for message in json.load(file, object_hook=parse_obj)['messages']:
-                # check if messasge contains text first
+
+                # any weird message types?
+                if message['type'] not in ['Generic', 'Share', 'Subscribe', 'Unsubscribe', 'Call']:
+                    print(f"Weird message type: {message['type']}")
+
+                # if text message
                 if 'content' in message:
-                    sender = message['sender_name']
-                    senders.append(sender)
-                    text = message['content']
-                    messages.append(text)
-                    timestamp = message['timestamp_ms']
-                    timestamps.append(timestamp)
-                    # print(f'from {filepath} {sender}: <{text}> to dataframe')
+                    # set category TEXT
+                    category.append('TEXT')
+                    # message content
+                    content = message['content']
+                    messages.append(content)
+                # if media
+                elif [i for i in dict_cases if i in message]:
+                    # get the single element of the set dict_cases within the message
+                    case = set(message.keys()).intersection(dict_cases).pop()
+                    # set category
+                    category.append(dict_cases[case])
+                    # content
+                    contents = []
+                    for content in message[case]:
+                        contents.append(content['uri'])
+                    messages.append(contents)
+                # if sticker
+                elif 'sticker' in message:
+                    # set category
+                    category.append('STICKER')
+                    # message content
+                    content = message['sticker']['uri']
+                    messages.append(content)
+                # if deleted message, message field is None
+                else:
+                    messages.append(None)
+                    category.append('DELETED')
+
+                # name
+                sender = message['sender_name']
+                senders.append(sender)
+
+                # timestamp
+                timestamp = message['timestamp_ms']
+                timestamps.append(timestamp)
+
+                # reactions
+                # appends list of tuples (reaction, reactor)
+                if 'reactions' in message:
+                    message_reactions = []
+                    for reaction in message['reactions']:
+                        emoji = reaction['reaction']
+                        reactor = reaction['actor']
+                        message_reactions.append((emoji, reactor))
+                    reactions.append(message_reactions)
+                else:
+                    reactions.append(None)
+
     print('converting to dataframe...')
-    df = pd.DataFrame({'message': messages, 'sender': senders, 'timestamp': timestamps})
+    df = pd.DataFrame({
+        'message': messages,
+        'sender': senders,
+        'timestamp': timestamps,
+        'reactions': reactions,
+        'category': category,
+        }
+    )
 
     # to pickle
     df.to_pickle(pickle_filename)
@@ -56,7 +121,7 @@ def json_to_pickle(pickle_filename='data_raw.pkl'):
     return df
 
 
-def clean_data(input_file, output_file=None, printouts=False):
+def clean_data(input_file: str, output_file: str = None, printouts: bool = False):
     """
     Makes the data dataframe-y by turning names into categorical and timestamp column a datetime index & fixing emoji
     :param printouts: if True print outs some information about the dataframe
@@ -75,21 +140,21 @@ def clean_data(input_file, output_file=None, printouts=False):
     erring_alt_name = "คคค า่ะะะร็"
     df['sender'].replace({erring_alt_name: 'Alex Errington'}, inplace=True)
 
-    # sender as categorical
+    # sender & category as categorical
     df['sender'] = df['sender'].astype('category')
+    df['category'] = df['category'].astype('category')
 
     # printouts
     if output_file is not None:
         df.to_pickle(output_file)
-    else:
-        pass
+
     if printouts:
         print(df.head())
         print(df.info())
         print(df.describe())
-        top_message = df.describe()['message']['top']
-        print(f'most common message: {top_message}')
-        print(f'Member names: {df.sender.cat.categories}')
+        # top_message = df.describe()['message']['top']
+        # print(f'most common message: {top_message}')
+        # print(f'Member names: {df.sender.cat.categories}')
 
     return df
 
@@ -132,10 +197,29 @@ def get_chat_names(data_file, to_file=False, to_numpy=False):
         return df
 
 
-# for testing
+def pkl_to_txt(input_file: str, output_file: str = 'data.txt') -> None:
+    """
+    prints data from .pkl file to .txt file
+    """
+    df = pd.read_pickle(input_file)
+    with open(output_file, 'w', encoding='utf-8') as f:
+        for t, msg, sender in df.itertuples():
+            msg.replace('\n', ' ')
+            f.write(t.strftime("%m/%d/%Y %H:%M:%S ") + sender + ": " + msg + '\n')
+    print(f"written to file {output_file}")
+
+
+def pkl_to_txt_chatnames(input_file: str = 'chatnames.pkl',
+                         output_file: str = 'chatnames.txt') -> None:
+    """
+    prints data from .pkl file to .txt file (specifically for chat names)
+    """
+    df = pd.read_pickle(input_file)
+    with open(output_file, 'w', encoding='utf-8') as f:
+        for t, sndr, name in df.itertuples():
+            f.write(t.strftime("%m/%d/%Y %H:%M:%S ") + ": " + name + '\n')
+    print(f"written to file {output_file}")
+
+
 if __name__ == '__main__':
-    json_to_pickle()
-    data = clean_data('data_raw.pkl', output_file='data.pkl', printouts=True)
-    chatnames = get_chat_names('data.pkl', to_file=True)
-    for chatname in chatnames['chatname']:
-        print(chatname)
+    pkl_to_txt_chatnames()
