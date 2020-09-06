@@ -2,6 +2,7 @@ import glob
 import os
 import json
 import pandas as pd
+import numpy as np
 
 
 def json_to_pickle(pickle_filename: str = 'data_raw.pkl'):
@@ -143,6 +144,9 @@ def clean_data(input_file: str, output_file: str = None, printouts: bool = False
     # sender & category as categorical
     df['sender'] = df['sender'].astype('category')
     df['category'] = df['category'].astype('category')
+
+    # replace None values with nan values
+    # df.fillna(value=np.nan, inplace=True)
 
     # printouts
     if output_file is not None:
