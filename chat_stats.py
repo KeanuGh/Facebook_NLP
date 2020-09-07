@@ -138,18 +138,18 @@ def who_reacts_the_most(dataframe: pd.DataFrame, plot: bool = False, printout: b
     return n_reacts
 
 
-def clean_emoji(series: pd.Series):
+def clean_emoji(dataframe: pd.DataFrame, column: str):
     """
-    cleans non-standard emoji from series and maps heart reacts to heart
+    cleans non-standard emoji from dataframe column 'column' and maps heart reacts to heart
     """
     # combine heart reacts
-    series.replace({'💗': '❤', '😍': '❤'}, inplace=True)
+    dataframe[column].replace({'💗': '❤', '😍': '❤'}, inplace=True)
 
     # restrict reacts to only the basic ones
     allowed_reacts = {'❤', '👍', '👎', '😢', '😠', '😆', '😮'}
-    series = series[series.isin(allowed_reacts)]
+    dataframe = dataframe[dataframe[column].isin(allowed_reacts)]
 
-    return series
+    return dataframe
 
 
 def who_uses_which_react(dataframe: pd.DataFrame, plot: bool = False, vmax=None, as_fraction: bool = False):
@@ -172,10 +172,15 @@ def who_uses_which_react(dataframe: pd.DataFrame, plot: bool = False, vmax=None,
     # create count column containing counts for emoji, name combinations
     dataframe = dataframe.groupby(['emoji', 'name']).size().reset_index().rename(columns={0: 'count'})
 
-    dataframe = clean_emoji(dataframe['emoji'])
+    dataframe = clean_emoji(dataframe, 'emoji')
 
     # PIVOT
     dataframe = dataframe.pivot_table(index='name', columns='emoji', values='count', fill_value=0)
+
+    # have all counts be as a fraction of total reactions for user
+    if as_fraction:
+        dataframe['sum'] = dataframe.sum(axis=1)
+        dataframe = dataframe.div(dataframe["sum"], axis=0).drop(['sum'], axis=1)
 
     # plot heatmap
     if plot:
@@ -216,7 +221,6 @@ def who_recieves_which_react(dataframe: pd.DataFrame, plot: bool = False, vmax=N
     # make react column a list of each react the message received (remove who reacted)
     def reduce_to_emoji(react_tuple):
         return [emoji for emoji, name in react_tuple]
-
     dataframe['reactions'] = dataframe['reactions'].apply(reduce_to_emoji)
     dataframe.columns = ['name', 'emoji']
 
@@ -224,7 +228,8 @@ def who_recieves_which_react(dataframe: pd.DataFrame, plot: bool = False, vmax=N
     dataframe = dataframe.explode('emoji')
 
     # clean emoji
-    dataframe['emoji'] = clean_emoji(dataframe['emoji'])
+    dataframe = clean_emoji(dataframe, 'emoji')
+    print(dataframe)
 
     # create count column containing counts for emoji, name combinations
     dataframe = dataframe.groupby(['emoji', 'name']).size().reset_index().rename(columns={0: 'count'})
@@ -235,6 +240,7 @@ def who_recieves_which_react(dataframe: pd.DataFrame, plot: bool = False, vmax=N
     # delete zero rows
     dataframe = dataframe[(dataframe.T != 0).any()]
 
+    # have all counts be as a fraction of total reactions for user
     if as_fraction:
         dataframe['sum'] = dataframe.sum(axis=1)
         dataframe = dataframe.div(dataframe["sum"], axis=0).drop(['sum'], axis=1)
@@ -297,5 +303,5 @@ if __name__ == '__main__':
 
     # data = who_uses_which_react(df_2020, plot=True, vmax=2500)
 
-    data = who_recieves_which_react(df_2020, plot=True, as_fraction=True)
+    data = who_recieves_which_react(df, plot=True, as_fraction=True)
     print(data.head())
