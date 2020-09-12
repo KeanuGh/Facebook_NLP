@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 
 
-def json_to_pickle(pickle_filename: str = 'data_raw.pkl'):
+def json_to_pickle(pickle_filename: str = 'data_raw.pkl') -> pd.DataFrame:
     """
     TODO: more user-friendly json file input
     Reads json files
@@ -122,14 +122,18 @@ def json_to_pickle(pickle_filename: str = 'data_raw.pkl'):
     return df
 
 
-def clean_data(input_file: str, output_file: str = None, printouts: bool = False):
+def clean_data(input_file: str, output_file: str = None,
+               printouts: bool = False, replace_names=None) -> pd.DataFrame:
     """
     Makes the data dataframe-y by turning names into categorical and timestamp column a datetime index & fixing emoji
+    :param replace_names: dictionary of names to replace: {'old name':'new name'}
     :param printouts: if True print outs some information about the dataframe
     :param input_file: path to pickle file containing dataframe
     :param output_file: if input prints out pickle file with this name
     :return: dataframe with nice clean data. columns: ['timestamp', 'sender', 'message'] index: timestamp
     """
+    if replace_names is None:
+        replace_names = {}
     df = pd.read_pickle(input_file)
 
     # to datetime
@@ -137,16 +141,16 @@ def clean_data(input_file: str, output_file: str = None, printouts: bool = False
     df.set_index('timestamp', inplace=True)
     df.sort_index(inplace=True)
 
-    # fix errington's alt account name
-    erring_alt_name = "คคค า่ะะะร็"
-    df['sender'].replace({erring_alt_name: 'Alex Errington'}, inplace=True)
+    # fix alt account names
+    if type(replace_names) == dict:
+        df['sender'].replace(replace_names, inplace=True)
 
     # sender & category as categorical
     df['sender'] = df['sender'].astype('category')
     df['category'] = df['category'].astype('category')
 
     # replace None values with nan values
-    # df.fillna(value=np.nan, inplace=True)
+    df.fillna(value=np.nan, inplace=True)
 
     # printouts
     if output_file is not None:
@@ -156,9 +160,6 @@ def clean_data(input_file: str, output_file: str = None, printouts: bool = False
         print(df.head())
         print(df.info())
         print(df.describe())
-        # top_message = df.describe()['message']['top']
-        # print(f'most common message: {top_message}')
-        # print(f'Member names: {df.sender.cat.categories}')
 
     return df
 
@@ -178,15 +179,21 @@ def get_chat_names(data_file, to_file=False, to_numpy=False):
     else:
         df = data_file
 
+    # get only messages
+    df = df[(df['message'].notna()) & (df['category'] == 'TEXT')]
+
     # get all messages with a group name change
     df = df[df['message'].str.contains('named the group')]
 
     # return the text after the string 'named the group '
-    df['chatname'] = df['message'].apply(lambda x: x[x.find('named the group ') + 16:])
+    df['chatname'] = df['message'].apply(lambda x: x[x.find('named the group ') + 16:].strip('.'))
     df.drop('message', axis=1, inplace=True)
 
     # drop chatnames containing a newline character because that's just crazy
     df = df[~df.chatname.str.contains('\n')]
+
+    # only need sender and chat name
+    df = df[['sender', 'chatname']]
 
     # to file(s)
     if to_file:
@@ -226,4 +233,6 @@ def pkl_to_txt_chatnames(input_file: str = 'chatnames.pkl',
 
 
 if __name__ == '__main__':
+    data = get_chat_names('2020-09-01_data_CLEAN.pkl', to_file=True)
+    print(data.head())
     pkl_to_txt_chatnames()

@@ -1,12 +1,15 @@
 from data_cleaning_functions import *
 import matplotlib.pyplot as plt
 import pandas as pd
+import re
 
 # shut the hell up pandas i know what I'm doing (narrator voice: he did not know what he was doing)
 pd.options.mode.chained_assignment = None
 
+data_path = './data/'
 
-def check_message_type(message_type: str):
+
+def check_message_type(message_type: str) -> bool:
     """
     Check if message type is a valid message type
     :param message_type: input type
@@ -22,14 +25,14 @@ def check_message_type(message_type: str):
         return True
 
 
-def whos_said_x_most(dataframe: pd.DataFrame, x: str):
+def whos_said_x_most(dataframe: pd.DataFrame, x: str) -> pd.DataFrame:
     dataframe = dataframe[dataframe.message.str.contains(rf'\b{x}\b', na=False, case=False)]
     print(f"the word '{x}' has been said {len(dataframe)} times!")
     print(dataframe.sender.value_counts())
     return dataframe
 
 
-def n_most_reacted_messages(dataframe: pd.DataFrame, message_type=None):
+def n_most_reacted_messages(dataframe: pd.DataFrame, message_type=None) -> pd.DataFrame:
     dataframe = dataframe[dataframe['reactions'].notna()]
     dataframe['n_reacts'] = dataframe.reactions.apply(lambda x: len(x))
 
@@ -40,7 +43,7 @@ def n_most_reacted_messages(dataframe: pd.DataFrame, message_type=None):
     return dataframe
 
 
-def most_posters(dataframe: pd.DataFrame, plot: bool = False, title=''):
+def most_posters(dataframe: pd.DataFrame, plot: bool = False, title='') -> pd.DataFrame:
     posters = dataframe.sender.value_counts().dropna()
 
     if plot:
@@ -71,14 +74,14 @@ def gen_wordcloud(dataframe: pd.DataFrame, stopwords=None):
         stopwords = nltk.corpus.stopwords.words('english')
 
     dataframe = dataframe[dataframe['category'] == 'TEXT']
-    text = dataframe['message'].str.cat()
+    text = dataframe['message'].str.cat(sep=' ')
     cloud = WordCloud(stopwords=stopwords).generate(text)
     plt.imshow(cloud, interpolation='bilinear')
     plt.axis("off")
     plt.show()
 
 
-def reacts_per_message(dataframe: pd.DataFrame, printout: bool = False, message_type=None):
+def reacts_per_message(dataframe: pd.DataFrame, printout: bool = False, message_type=None) -> pd.DataFrame:
     """
     Calculates the number of reactions a poster has gotten divided by the number of times posted
     :param message_type: string or tuple of strings
@@ -86,7 +89,6 @@ def reacts_per_message(dataframe: pd.DataFrame, printout: bool = False, message_
     :param dataframe:
     :return:
     """
-
     if type(message_type) == str:
         check_message_type(message_type)
         dataframe = dataframe.loc[dataframe['category'] == message_type.upper()]
@@ -108,7 +110,7 @@ def reacts_per_message(dataframe: pd.DataFrame, printout: bool = False, message_
     return react_rate
 
 
-def who_reacts_the_most(dataframe: pd.DataFrame, plot: bool = False, printout: bool = False, title: str = ''):
+def who_reacts_the_most(dataframe: pd.DataFrame, plot: bool = False, printout: bool = False, title: str = '') -> list:
     # extract names from reactions
     reactions = dataframe['reactions'].dropna().to_numpy()
     names = [name for emoji, name in [react for reaction in reactions for react in reaction]]
@@ -138,7 +140,7 @@ def who_reacts_the_most(dataframe: pd.DataFrame, plot: bool = False, printout: b
     return n_reacts
 
 
-def clean_emoji(dataframe: pd.DataFrame, column: str):
+def clean_emoji(dataframe: pd.DataFrame, column: str) -> pd.DataFrame:
     """
     cleans non-standard emoji from dataframe column 'column' and maps heart reacts to heart
     """
@@ -152,7 +154,8 @@ def clean_emoji(dataframe: pd.DataFrame, column: str):
     return dataframe
 
 
-def who_uses_which_react(dataframe: pd.DataFrame, plot: bool = False, vmax=None, as_fraction: bool = False):
+def who_uses_which_react(dataframe: pd.DataFrame, plot: bool = False, vmax=None, as_fraction: bool = False) \
+        -> pd.DataFrame:
     """
     Who uses which react the most, only takes into account the 'basic' facebook reacts. Casts all 'heart' reacts to '❤'
     :param as_fraction:
@@ -210,10 +213,10 @@ def who_uses_which_react(dataframe: pd.DataFrame, plot: bool = False, vmax=None,
     return dataframe
 
 
-def who_recieves_which_react(dataframe: pd.DataFrame, plot: bool = False, vmax=None, as_fraction: bool = False):
+def who_recieves_which_react(dataframe: pd.DataFrame, plot: bool = False, vmax=None, as_fraction: bool = False) \
+        -> pd.DataFrame:
     """
     Who recieves which react for messages they send?
-    :return:
     """
     # get just names and the reactions for messages with reacts
     dataframe = dataframe[dataframe['reactions'].notna()].reset_index()[['sender', 'reactions']]
@@ -221,6 +224,7 @@ def who_recieves_which_react(dataframe: pd.DataFrame, plot: bool = False, vmax=N
     # make react column a list of each react the message received (remove who reacted)
     def reduce_to_emoji(react_tuple):
         return [emoji for emoji, name in react_tuple]
+
     dataframe['reactions'] = dataframe['reactions'].apply(reduce_to_emoji)
     dataframe.columns = ['name', 'emoji']
 
@@ -255,7 +259,7 @@ def who_recieves_which_react(dataframe: pd.DataFrame, plot: bool = False, vmax=N
         from seaborn import heatmap
         if as_fraction:
             fmt = '.0%'
-            title = "percentage-wise counts of users recieving each react"
+            title = "Percentage-wise counts of users recieving each react"
         else:
             fmt = 'd'
             title = "Counts of users recieving each react"
@@ -273,13 +277,61 @@ def who_recieves_which_react(dataframe: pd.DataFrame, plot: bool = False, vmax=N
     return dataframe
 
 
+def get_nicknames(dataframe: pd.DataFrame, to_txt: bool = False, replace_names=None,
+                  filename: str = 'nicknames.txt') -> pd.DataFrame:
+    """
+    Check out what nicknames everyone has had
+    :param dataframe: input dataframe
+    :param to_txt: whether to get a txt file with all nicknames listed
+    :param replace_names: dictionary of names to replace 'old name':'new name'
+    :param filename: path of output txt file if to_txt True
+    :return: heirarchical dataframe of Name:timestamp index of all nicknames
+    """
+    # just text messages
+    if replace_names is None:
+        replace_names = {}
+    dataframe = dataframe[(dataframe['message'].notna()) & (dataframe['category'] == 'TEXT')]
+
+    # messages containing string
+    dataframe = dataframe[dataframe['message'].str.contains('set the nickname for')]
+
+    # extract name and nickname
+    pattern = r'set the nickname for (?P<name>.*?) to (?P<nickname>.*)$'
+    dataframe = dataframe['message'].str.extract(pattern, re.DOTALL)
+    # facebook formatting broken when a nickname change ends in a question or exclamation mark.
+    # usually all nickname changes end in a full stop '.' but if the new nickname ends in '?' or '!' there is no '.'.
+    # strip trailing periods like this b/c i spent 3 hours lost in regex hell trying conditional groups
+    dataframe['nickname'] = dataframe['nickname'].apply(lambda x: x[:-1] if x.endswith('.') else x)
+
+    # fix alt names
+    if type(replace_names) == dict:
+        dataframe['name'].replace(replace_names, inplace=True)
+
+    # reindex
+    dataframe.reset_index(level=0, inplace=True)
+    dataframe = dataframe.set_index(['name', 'timestamp'])
+    dataframe.sort_index(inplace=True)
+
+    if to_txt:
+        with open(filename, 'w', encoding="utf-8") as file:
+            curr_name = ''
+            for (name, time), row in dataframe.iterrows():
+                if name != curr_name:
+                    curr_name = name
+                    file.write(f"\n{name}: \n")
+                file.write("\t" + time.strftime("%Y-%m-%d %H:%M ") + row.nickname + "\n")
+
+    return dataframe
+
+
 if __name__ == '__main__':
     datafile = '2020-09-01_data.pkl'
     datafile_clean = '2020-09-01_data_CLEAN.pkl'
 
     # # extract and clean data
+    name_dict = {"คคค า่ะะะร็": 'Alex Errington'}
     # json_to_pickle(datafile)
-    # clean_data(datafile, datafile_clean, printouts=False)
+    # clean_data(datafile, datafile_clean, replace_names=name_dict, printouts=False)
 
     df = pd.read_pickle(datafile_clean)
     df_2020 = df[df.index.year == 2020]
@@ -303,5 +355,10 @@ if __name__ == '__main__':
 
     # data = who_uses_which_react(df_2020, plot=True, vmax=2500)
 
-    data = who_recieves_which_react(df, plot=True, as_fraction=True)
-    print(data.head())
+    # data = who_recieves_which_react(df, plot=True, as_fraction=True)
+
+    data = get_nicknames(df, to_txt=True, replace_names=name_dict)
+
+    # broken_rows = data[data.isnull().any(axis=1)]
+    # broken_rows = df.loc[broken_rows.index]
+    # nickname_changes = df.loc[data.index]
