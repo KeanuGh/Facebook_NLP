@@ -277,51 +277,62 @@ def who_recieves_which_react(dataframe: pd.DataFrame, plot: bool = False, vmax=N
     return dataframe
 
 
-def get_nicknames(dataframe: pd.DataFrame, to_txt: bool = False, replace_names=None,
+def get_nicknames(dataframe: pd.DataFrame, your_name: str, to_txt: bool = False, replace_names=None,
                   filename: str = 'nicknames.txt') -> pd.DataFrame:
     """
     Check out what nicknames everyone has had
     :param dataframe: input dataframe
+    :param your_name: the name of the person whose data has been downloaded
     :param to_txt: whether to get a txt file with all nicknames listed
     :param replace_names: dictionary of names to replace 'old name':'new name'
     :param filename: path of output txt file if to_txt True
     :return: heirarchical dataframe of Name:timestamp index of all nicknames
     """
-    # just text messages
+
     if replace_names is None:
         replace_names = {}
+
+    # just text messages
     dataframe = dataframe[(dataframe['message'].notna()) & (dataframe['category'] == 'TEXT')]
 
-    # messages containing string
-    dataframe = dataframe[dataframe['message'].str.contains('set the nickname for')]
-
     # extract name and nickname
-    pattern = r'set the nickname for (?P<name>.*?) to (?P<nickname>.*)$'
-    dataframe = dataframe['message'].str.extract(pattern, re.DOTALL)
+    nicknames_df = dataframe[dataframe['message'].str.contains('set the nickname for')]
+    pattern1 = r'set the nickname for (?P<name>.*?) to (?P<nickname>.*)$'
+    nicknames_df = nicknames_df['message'].str.extract(pattern1, re.DOTALL)
+
+    # need to handle differently when parsing downloader's nicknames
+    your_nicknames_df = dataframe[dataframe['message'].str.contains('set your nickname to')]
+    pattern2 = r'set your nickname to (?P<nickname>.*)$'
+    your_nicknames_df = your_nicknames_df['message'].str.extract(pattern2, re.DOTALL)
+    your_nicknames_df['name'] = your_name
+
+    # mix them together
+    nicknames_df = nicknames_df.append(your_nicknames_df).sort_index()
+
     # facebook formatting broken when a nickname change ends in a question or exclamation mark.
     # usually all nickname changes end in a full stop '.' but if the new nickname ends in '?' or '!' there is no '.'.
     # strip trailing periods like this b/c i spent 3 hours lost in regex hell trying conditional groups
-    dataframe['nickname'] = dataframe['nickname'].apply(lambda x: x[:-1] if x.endswith('.') else x)
+    nicknames_df['nickname'] = nicknames_df['nickname'].apply(lambda x: x[:-1] if x.endswith('.') else x)
 
     # fix alt names
     if type(replace_names) == dict:
-        dataframe['name'].replace(replace_names, inplace=True)
+        nicknames_df['name'].replace(replace_names, inplace=True)
 
     # reindex
-    dataframe.reset_index(level=0, inplace=True)
-    dataframe = dataframe.set_index(['name', 'timestamp'])
-    dataframe.sort_index(inplace=True)
+    nicknames_df.reset_index(level=0, inplace=True)
+    nicknames_df.set_index(['name', 'timestamp'], inplace=True)
+    nicknames_df.sort_index(inplace=True)
 
     if to_txt:
         with open(filename, 'w', encoding="utf-8") as file:
             curr_name = ''
-            for (name, time), row in dataframe.iterrows():
+            for (name, time), row in nicknames_df.iterrows():
                 if name != curr_name:
                     curr_name = name
                     file.write(f"\n{name}: \n")
                 file.write("\t" + time.strftime("%Y-%m-%d %H:%M ") + row.nickname + "\n")
 
-    return dataframe
+    return nicknames_df
 
 
 if __name__ == '__main__':
@@ -357,8 +368,4 @@ if __name__ == '__main__':
 
     # data = who_recieves_which_react(df, plot=True, as_fraction=True)
 
-    data = get_nicknames(df, to_txt=True, replace_names=name_dict)
-
-    # broken_rows = data[data.isnull().any(axis=1)]
-    # broken_rows = df.loc[broken_rows.index]
-    # nickname_changes = df.loc[data.index]
+    data = get_nicknames(df, to_txt=True, your_name='Bob Saget', replace_names=name_dict)
