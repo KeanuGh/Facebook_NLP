@@ -297,17 +297,23 @@ def get_nicknames(dataframe: pd.DataFrame, your_name: str, to_txt: bool = False,
 
     # extract name and nickname
     nicknames_df = dataframe[dataframe['message'].str.contains('set the nickname for')]
-    pattern1 = r'set the nickname for (?P<name>.*?) to (?P<nickname>.*)$'
+    pattern1 = r'^(?:.*) set the nickname for (?P<name>.*?) to (?P<nickname>.*)$'
     nicknames_df = nicknames_df['message'].str.extract(pattern1, re.DOTALL)
 
     # need to handle differently when parsing downloader's nicknames
     your_nicknames_df = dataframe[dataframe['message'].str.contains('set your nickname to')]
-    pattern2 = r'set your nickname to (?P<nickname>.*)$'
+    pattern2 = r'^(?:.*) set your nickname to (?P<nickname>.*)$'
     your_nicknames_df = your_nicknames_df['message'].str.extract(pattern2, re.DOTALL)
     your_nicknames_df['name'] = your_name
 
+    # or if someone set their own nickname
+    own_nicknames_df = dataframe[dataframe['message'].str.contains('own nickname to')]
+    pattern3 = r'^(?:.*) set (?:.*) own nickname to (?P<nickname>.*)$'
+    own_nicknames_df = own_nicknames_df['message'].str.extract(pattern3, re.DOTALL)
+    own_nicknames_df['name'] = dataframe[dataframe.index.isin(own_nicknames_df.index)]['sender']
+
     # mix them together
-    nicknames_df = nicknames_df.append(your_nicknames_df).sort_index()
+    nicknames_df = nicknames_df.append([your_nicknames_df, own_nicknames_df]).sort_index()
 
     # facebook formatting broken when a nickname change ends in a question or exclamation mark.
     # usually all nickname changes end in a full stop '.' but if the new nickname ends in '?' or '!' there is no '.'.
@@ -368,4 +374,4 @@ if __name__ == '__main__':
 
     # data = who_recieves_which_react(df, plot=True, as_fraction=True)
 
-    data = get_nicknames(df, to_txt=True, your_name='Bob Saget', replace_names=name_dict)
+    data = get_nicknames(df, to_txt=True, your_name='Keanu Ghorbanian', replace_names=name_dict)
