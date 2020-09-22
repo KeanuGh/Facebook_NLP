@@ -43,7 +43,7 @@ def n_most_reacted_messages(dataframe: pd.DataFrame, message_type=None) -> pd.Da
     return dataframe
 
 
-def most_posters(dataframe: pd.DataFrame, plot: bool = False, title='') -> pd.DataFrame:
+def most_posters(dataframe: pd.DataFrame, plot: bool = False, title: str = '') -> pd.DataFrame:
     posters = dataframe.sender.value_counts().dropna()
 
     if plot:
@@ -323,14 +323,18 @@ def get_nicknames(dataframe: pd.DataFrame, your_name: str, to_txt: bool = False,
     # fix alt names
     if type(replace_names) == dict:
         nicknames_df['name'].replace(replace_names, inplace=True)
+    else:
+        raise Exception("replace_names must be formatted as a dictionary.")
 
     # reindex
     nicknames_df.reset_index(level=0, inplace=True)
     nicknames_df.set_index(['name', 'timestamp'], inplace=True)
     nicknames_df.sort_index(inplace=True)
 
+    # Print nicknames to a file
     if to_txt:
         with open(filename, 'w', encoding="utf-8") as file:
+            # formatted as <name>: <list of timestamp: nickname>
             curr_name = ''
             for (name, time), row in nicknames_df.iterrows():
                 if name != curr_name:
@@ -341,12 +345,75 @@ def get_nicknames(dataframe: pd.DataFrame, your_name: str, to_txt: bool = False,
     return nicknames_df
 
 
+def plot_timestamps(dataframe: pd.DataFrame, n_bins: int = 10, bin_by: str = None) -> None:
+    times = dataframe.index.to_series()
+
+    bin_by = bin_by.lower()
+
+    if bin_by == 'weekday':
+        weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        days = pd.Categorical(times.dt.strftime('%a'), categories=weekdays, ordered=True)
+        days_count = days.value_counts()
+        days_count.plot(kind='bar', width=.9, align='edge')
+        plt.title('Number of messages by weekday')
+        plt.ylabel('Number of messages')
+        plt.xlabel('Weekday')
+        plt.show()
+
+    elif bin_by == 'hour':
+        hours = pd.Categorical(times.dt.strftime('%H'), ordered=True)
+        hours_count = hours.value_counts()
+        hours_count.plot(kind='bar', width=.9, align='edge')
+        plt.title('Number of messages by hour of the day')
+        plt.ylabel('Number of messages')
+        plt.xlabel('Hour of day')
+        plt.show()
+
+    # TODO:
+    # elif bin_by == 'weekhour':
+    #     import matplotlib.dates as mdates
+    #     hours = times.resample('H')
+    #     print(hours.head())
+    #     # fig, ax1 = plt.subplots(figsize=(10, 5))
+    #     # ax1.set(xlabel='', ylabel='Total number of messages')
+    #     # ax1.plot(times, times, color='b')
+    #     #
+    #     # ax1.xaxis.set(
+    #     #     major_locator=mdates.DayLocator(),
+    #     #     major_formatter=mdates.DateFormatter("\n\n%A"),
+    #     #     minor_locator=mdates.HourLocator((0, 12)),
+    #     #     minor_formatter=mdates.DateFormatter("%H"),
+    #     # )
+    #     # plt.show()
+
+    else:
+        plt.hist(times, bins=n_bins)
+        plt.xlabel("time")
+        plt.ylabel("Number of messages")
+        plt.show()
+
+
+def get_youtube_links(dataframe: pd.DataFrame, to_file: bool = False):
+    dataframe = dataframe[(dataframe['message'].notna()) & (dataframe['category'] == 'TEXT')]
+
+    yt_pattern = '((?:https?:)?\/\/)?((?:www|m)\.)?((?:youtube\.com|youtu.be))(\/(?:[\w\-]+\?v=|embed\/|v\/)?)([\w\-]+)(\S+)?'
+    yt_links = dataframe[dataframe['message'].str.contains(yt_pattern)]['message']
+    yt_links = yt_links.str.replace('\n', '')
+
+    if to_file:
+        with open('youtube_links.txt', 'w', encoding="utf-8") as file:
+            for time, link in yt_links.iteritems():
+                file.write(link + "\n")
+    return yt_links
+
+
 if __name__ == '__main__':
     datafile = '2020-09-01_data.pkl'
     datafile_clean = '2020-09-01_data_CLEAN.pkl'
 
-    # # extract and clean data
     name_dict = {"คคค า่ะะะร็": 'Alex Errington'}
+
+    # # extract and clean data
     # json_to_pickle(datafile)
     # clean_data(datafile, datafile_clean, replace_names=name_dict, printouts=False)
 
@@ -374,4 +441,8 @@ if __name__ == '__main__':
 
     # data = who_recieves_which_react(df, plot=True, as_fraction=True)
 
-    data = get_nicknames(df, to_txt=True, your_name='Keanu Ghorbanian', replace_names=name_dict)
+    # data = get_nicknames(df, to_txt=True, your_name='Keanu Ghorbanian', replace_names=name_dict)
+
+    links = get_youtube_links(df, to_file=True)
+
+    # plot_timestamps(df, bin_by='weekhour')

@@ -3,12 +3,14 @@ import os
 import json
 import pandas as pd
 import numpy as np
+import re
 
 
-def json_to_pickle(pickle_filename: str = 'data_raw.pkl') -> pd.DataFrame:
+def json_to_pickle(pickle_filename: str = 'data_raw.pkl', printout: bool = False) -> pd.DataFrame:
     """
     TODO: more user-friendly json file input
     Reads json files
+    :param printout: Whether to print head of output file
     :param pickle_filename: name of output pickle file
     :return: raw pandas dataframe
     """
@@ -43,6 +45,7 @@ def json_to_pickle(pickle_filename: str = 'data_raw.pkl') -> pd.DataFrame:
         'gifs': 'GIF',
         'audio_files': 'AUDIO',
         'files': 'FILE',
+        'share': 'SHARE',
     }
 
     for filepath in file_list:
@@ -58,8 +61,13 @@ def json_to_pickle(pickle_filename: str = 'data_raw.pkl') -> pd.DataFrame:
                 if 'content' in message:
                     # set category TEXT
                     category.append('TEXT')
-                    # message content
-                    content = message['content']
+                    # if just a share, set message content as link shared
+                    if message['type'] == 'Share' \
+                            and re.search('^(?:.*) sent an attachment.$', message['content'], re.DOTALL):
+                        content = ';'.join(str(x) for x in message['share'].values())
+                    # otherwise just append message contents
+                    else:
+                        content = message['content']
                     messages.append(content)
                 # if media
                 elif [i for i in dict_cases if i in message]:
@@ -116,8 +124,10 @@ def json_to_pickle(pickle_filename: str = 'data_raw.pkl') -> pd.DataFrame:
 
     # to pickle
     df.to_pickle(pickle_filename)
-    print(f'data pickled to {pickle_filename}')
-    print(df.head())
+
+    if printout:
+        print(f'data pickled to {pickle_filename}')
+        print(df.head())
 
     return df
 
